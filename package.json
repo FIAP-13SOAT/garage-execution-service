@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src"
   },
   "keywords": [],
   "author": "",
@@ -22,10 +23,15 @@
     "mongoose": "^9.3.3"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/amqplib": "^0.10.8",
     "@types/express": "^5.0.6",
     "@types/node": "^25.5.0",
+    "eslint": "^10.1.0",
+    "eslint-plugin-security": "^4.0.0",
+    "eslint-plugin-sonarjs": "^4.0.2",
     "tsx": "^4.21.0",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.2",
+    "typescript-eslint": "^8.57.2"
   }
 }
