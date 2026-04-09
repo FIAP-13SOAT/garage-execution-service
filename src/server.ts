@@ -10,6 +10,7 @@ import { CancelExecutionUseCase } from './application/executionQueue/CancelExecu
 import { StockCommandProducer } from './adapters/outbound/messaging/StockCommandProducer.js';
 import { ExecutionReplyProducer } from './adapters/outbound/messaging/ExecutionReplyProducer.js';
 import { ExecutionCommandConsumer } from './adapters/inbound/messaging/ExecutionCommandConsumer.js';
+import { StockReplyConsumer } from './adapters/inbound/messaging/StockReplyConsumer.js';
 
 const start = async (): Promise<void> => {
   await connectDatabase();
@@ -29,6 +30,13 @@ const start = async (): Promise<void> => {
   );
 
   await consumer.start();
+
+  const stockReplyConsumer = new StockReplyConsumer(
+    channel,
+    new CancelExecutionUseCase(executionQueueGateway),
+    replyProducer,
+  );
+  await stockReplyConsumer.start();
 
   app.listen(env.port, () => {
     console.log(`garage-execution-service running on port ${env.port}`);
