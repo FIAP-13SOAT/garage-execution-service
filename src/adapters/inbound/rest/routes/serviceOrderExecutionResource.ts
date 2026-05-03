@@ -5,6 +5,8 @@ import { FinishExecutionUseCase } from '../../../../application/serviceOrderExec
 import { GetExecutionUseCase } from '../../../../application/serviceOrderExecution/GetExecutionUseCase.js';
 import { ServiceOrderExecutionPresenter } from '../presenters/ServiceOrderExecutionPresenter.js';
 import { ServiceOrderExecutionController } from '../controllers/ServiceOrderExecutionController.js';
+import { requireRole } from '../middlewares/requireRole.js';
+import { UserRole } from '../../../../shared/types/UserRole.js';
 
 const gateway = new ServiceOrderExecutionGatewayImpl();
 const presenter = new ServiceOrderExecutionPresenter();
@@ -17,8 +19,8 @@ const controller = new ServiceOrderExecutionController(
 
 const router = Router();
 
-router.post('/:serviceOrderId/start-execution', controller.start.bind(controller));
-router.post('/:serviceOrderId/finish-execution', controller.finish.bind(controller));
-router.get('/:serviceOrderId/execution', controller.get.bind(controller));
+router.post('/:serviceOrderId/start-execution', requireRole(UserRole.ADMIN, UserRole.MECHANIC), controller.start.bind(controller));
+router.post('/:serviceOrderId/finish-execution', requireRole(UserRole.ADMIN, UserRole.MECHANIC), controller.finish.bind(controller));
+router.get('/:serviceOrderId/execution', requireRole(UserRole.ADMIN, UserRole.MECHANIC, UserRole.CLERK), controller.get.bind(controller));
 
 export default router;
