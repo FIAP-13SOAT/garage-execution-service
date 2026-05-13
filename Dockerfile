@@ -8,7 +8,10 @@ RUN npm run build
 
 FROM node:24-alpine AS production
 WORKDIR /app
-ENV NODE_ENV=production
+ENV NODE_ENV=production \
+    DD_SERVICE=garage-execution-service \
+    DD_ENV=production \
+    DD_VERSION=1.0.0
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
