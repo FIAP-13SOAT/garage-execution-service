@@ -9,7 +9,9 @@ import type { EnqueueServiceOrderUseCase } from '../../../application/executionQ
 import type { CancelExecutionUseCase } from '../../../application/executionQueue/CancelExecutionUseCase.js';
 import type { StockCommandProducer } from '../../outbound/messaging/StockCommandProducer.js';
 import type { ExecutionReplyProducer } from '../../outbound/messaging/ExecutionReplyProducer.js';
+import { setupQueue } from '../../outbound/messaging/setupQueue.js';
 import { toUUID } from '../../../shared/types/UUID.js';
+import { Logger } from '../../../shared/logger/Logger.js';
 
 const QUEUE = 'execution.commands';
 
@@ -23,7 +25,7 @@ export class ExecutionCommandConsumer {
   ) {}
 
   async start(): Promise<void> {
-    await this.channel.assertQueue(QUEUE, { durable: true });
+    await setupQueue(this.channel, QUEUE);
     await this.channel.consume(QUEUE, async (msg) => {
       if (!msg) return;
       try {
@@ -31,11 +33,11 @@ export class ExecutionCommandConsumer {
         await this.handle(type, payload);
         this.channel.ack(msg);
       } catch (err) {
-        console.error(`[ExecutionCommandConsumer] Failed to process message:`, err);
+        Logger.error('[ExecutionCommandConsumer] Failed to process message', { err });
         this.channel.nack(msg, false, false);
       }
     });
-    console.log(`[ExecutionCommandConsumer] Listening on ${QUEUE}`);
+    Logger.info('[ExecutionCommandConsumer] Listening', { queue: QUEUE });
   }
 
   private async handle(type: string, payload: unknown): Promise<void> {
@@ -47,7 +49,7 @@ export class ExecutionCommandConsumer {
         await this.handleCancelarExecucao(payload as CancelarExecucaoPayload);
         break;
       default:
-        console.warn(`[ExecutionCommandConsumer] Unknown message type: ${type}`);
+        Logger.warn('[ExecutionCommandConsumer] Unknown message type', { type });
     }
   }
 

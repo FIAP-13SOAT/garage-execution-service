@@ -5,6 +5,7 @@ import {
   type StatusAtualizadoPayload,
   type ExecucaoConcluidaPayload,
 } from '../../../application/messaging/messages.js';
+import { setupQueue } from './setupQueue.js';
 
 const QUEUE = 'execution.events';
 
@@ -20,7 +21,7 @@ export class ExecutionEventProducer {
   }
 
   private async send<T>(type: string, payload: T): Promise<void> {
-    await this.channel.assertQueue(QUEUE, { durable: true });
+    await setupQueue(this.channel, QUEUE);
     const message: SagaMessage<T> = { type, payload };
     this.channel.sendToQueue(QUEUE, Buffer.from(JSON.stringify(message)), { persistent: true });
   }
