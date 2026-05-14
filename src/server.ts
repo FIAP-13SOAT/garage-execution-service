@@ -4,6 +4,7 @@ import app from './app.js';
 import { connectDatabase } from './adapters/outbound/database/connection.js';
 import { getRabbitMQChannel } from './adapters/outbound/messaging/rabbitmq.js';
 import { env } from './shared/config/env.js';
+import { Logger } from './shared/logger/Logger.js';
 import { ExecutionQueueGatewayImpl } from './adapters/outbound/database/ExecutionQueueGateway.js';
 import { EnqueueServiceOrderUseCase } from './application/executionQueue/EnqueueServiceOrderUseCase.js';
 import { CancelExecutionUseCase } from './application/executionQueue/CancelExecutionUseCase.js';
@@ -39,11 +40,11 @@ const start = async (): Promise<void> => {
   await stockReplyConsumer.start();
 
   app.listen(env.port, () => {
-    console.log(`garage-execution-service running on port ${env.port}`);
+    Logger.info(`garage-execution-service running on port ${env.port}`);
   });
 };
 
 start().catch((err) => {
-  console.error('Failed to start server:', err);
+  Logger.error('Failed to start server', { err });
   process.exit(1);
 });
