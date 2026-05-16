@@ -8,7 +8,9 @@ import {
 } from '../../../application/messaging/messages.js';
 import type { CancelExecutionUseCase } from '../../../application/executionQueue/CancelExecutionUseCase.js';
 import type { ExecutionReplyProducer } from '../../outbound/messaging/ExecutionReplyProducer.js';
+import { setupQueue } from '../../outbound/messaging/setupQueue.js';
 import { toUUID } from '../../../shared/types/UUID.js';
+import { Logger } from '../../../shared/logger/Logger.js';
 
 const QUEUE = 'stock.replies';
 
@@ -20,7 +22,7 @@ export class StockReplyConsumer {
   ) {}
 
   async start(): Promise<void> {
-    await this.channel.assertQueue(QUEUE, { durable: true });
+    await setupQueue(this.channel, QUEUE);
     await this.channel.consume(QUEUE, async (msg) => {
       if (!msg) return;
       try {
@@ -28,11 +30,11 @@ export class StockReplyConsumer {
         await this.handle(type, payload);
         this.channel.ack(msg);
       } catch (err) {
-        console.error(`[StockReplyConsumer] Failed to process message:`, err);
+        Logger.error('[StockReplyConsumer] Failed to process message', { err });
         this.channel.nack(msg, false, false);
       }
     });
-    console.log(`[StockReplyConsumer] Listening on ${QUEUE}`);
+    Logger.info('[StockReplyConsumer] Listening', { queue: QUEUE });
   }
 
   private async handle(type: string, payload: unknown): Promise<void> {
@@ -47,7 +49,7 @@ export class StockReplyConsumer {
         await this.handleEstoqueRestaurado(payload as EstoqueRestauradoPayload);
         break;
       default:
-        console.warn(`[StockReplyConsumer] Unknown message type: ${type}`);
+        Logger.warn('[StockReplyConsumer] Unknown message type', { type });
     }
   }
 
@@ -69,8 +71,6 @@ export class StockReplyConsumer {
   }
 
   private async handleEstoqueRestaurado(payload: EstoqueRestauradoPayload): Promise<void> {
-    console.log(
-      `[StockReplyConsumer] Stock restored for service order ${payload.serviceOrderId}`,
-    );
+    Logger.info('[StockReplyConsumer] Stock restored', { serviceOrderId: payload.serviceOrderId });
   }
 }

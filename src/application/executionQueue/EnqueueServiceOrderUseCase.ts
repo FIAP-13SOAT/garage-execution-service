@@ -15,7 +15,7 @@ export class EnqueueServiceOrderUseCase {
     const existing = await this.gateway.findByServiceOrderId(command.serviceOrderId);
 
     if (existing && !existing.isCancelled()) {
-      throw new ExecutionQueueAlreadyExistsException(command.serviceOrderId);
+      return existing;
     }
 
     const queue = new ExecutionQueue({
