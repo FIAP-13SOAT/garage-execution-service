@@ -10,8 +10,10 @@ import { EnqueueServiceOrderUseCase } from './application/executionQueue/Enqueue
 import { CancelExecutionUseCase } from './application/executionQueue/CancelExecutionUseCase.js';
 import { StockCommandProducer } from './adapters/outbound/messaging/StockCommandProducer.js';
 import { ExecutionReplyProducer } from './adapters/outbound/messaging/ExecutionReplyProducer.js';
+import { ExecutionEventProducer } from './adapters/outbound/messaging/ExecutionEventProducer.js';
 import { ExecutionCommandConsumer } from './adapters/inbound/messaging/ExecutionCommandConsumer.js';
 import { StockReplyConsumer } from './adapters/inbound/messaging/StockReplyConsumer.js';
+import { createServiceOrderExecutionRouter } from './adapters/inbound/rest/routes/serviceOrderExecutionResource.js';
 
 const start = async (): Promise<void> => {
   await connectDatabase();
@@ -21,6 +23,7 @@ const start = async (): Promise<void> => {
   const executionQueueGateway = new ExecutionQueueGatewayImpl();
   const stockProducer = new StockCommandProducer(channel);
   const replyProducer = new ExecutionReplyProducer(channel);
+  const eventProducer = new ExecutionEventProducer(channel);
 
   const consumer = new ExecutionCommandConsumer(
     channel,
@@ -38,6 +41,8 @@ const start = async (): Promise<void> => {
     replyProducer,
   );
   await stockReplyConsumer.start();
+
+  app.use('/service-orders', createServiceOrderExecutionRouter(eventProducer));
 
   app.listen(env.port, () => {
     Logger.info(`garage-execution-service running on port ${env.port}`);

@@ -1,7 +1,6 @@
 import express from 'express';
 import type { NextFunction, Request, Response } from 'express';
 import healthResource from './adapters/inbound/rest/routes/healthResource.js';
-import serviceOrderExecutionResource from './adapters/inbound/rest/routes/serviceOrderExecutionResource.js';
 import { AppError } from './shared/errors/AppError.js';
 import { Logger } from './shared/logger/Logger.js';
 
@@ -10,7 +9,6 @@ const app = express();
 app.disable('x-powered-by');
 app.use(express.json());
 app.use('/health', healthResource);
-app.use('/service-orders', serviceOrderExecutionResource);
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   if (err instanceof AppError) {
