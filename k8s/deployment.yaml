@@ -17,9 +17,9 @@ spec:
     spec:
       containers:
         - name: garage-execution-service
-          image: <ECR_REGISTRY>/garage-execution-service:latest
+          image: 500431122450.dkr.ecr.us-east-1.amazonaws.com/garage-app:execution-latest
           ports:
-            - containerPort: 8084
+            - containerPort: 3000
           envFrom:
             - configMapRef:
                 name: garage-execution-service-config
@@ -53,13 +53,13 @@ spec:
           livenessProbe:
             httpGet:
               path: /health
-              port: 8084
+              port: 3000
             initialDelaySeconds: 15
             periodSeconds: 20
           readinessProbe:
             httpGet:
               path: /health
-              port: 8084
+              port: 3000
             initialDelaySeconds: 5
             periodSeconds: 10
       securityContext:
