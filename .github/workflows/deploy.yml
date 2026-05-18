@@ -1,0 +1,59 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  EKS_CLUSTER_NAME: garage-cluster
+  SERVICE_NAME: garage-execution-service
+
+jobs:
+  deploy:
+    name: Build, Push and Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$SERVICE_NAME:$IMAGE_TAG -t $ECR_REGISTRY/$SERVICE_NAME:latest .
+          docker push $ECR_REGISTRY/$SERVICE_NAME:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$SERVICE_NAME:latest
+
+      - name: Update kubeconfig
+        run: aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME
+
+      - name: Apply Kubernetes manifests
+        env:
+          ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          kubectl apply -f k8s/configmap.yaml
+          kubectl apply -f k8s/service.yaml
+          kubectl apply -f k8s/hpa.yaml
+          sed -e "s|<ECR_REGISTRY>|$ECR_REGISTRY|g" \
+              -e "s|$SERVICE_NAME:latest|$SERVICE_NAME:$IMAGE_TAG|g" \
+              k8s/deployment.yaml | kubectl apply -f -
+
+      - name: Wait for rollout
+        run: kubectl rollout status deployment/$SERVICE_NAME --timeout=5m
