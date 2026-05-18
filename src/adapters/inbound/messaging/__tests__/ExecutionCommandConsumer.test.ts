@@ -7,19 +7,23 @@ import type { EnqueueServiceOrderUseCase } from '../../../../application/executi
 import type { CancelExecutionUseCase } from '../../../../application/executionQueue/CancelExecutionUseCase.js';
 import type { StockCommandProducer } from '../../../outbound/messaging/StockCommandProducer.js';
 import type { ExecutionReplyProducer } from '../../../outbound/messaging/ExecutionReplyProducer.js';
-import type { Channel } from 'amqplib';
+import type { SQSBroker } from '../../../outbound/messaging/SQSBroker.js';
 
 const orderId = toUUID('order-123');
 const stockId = toUUID('stock-1');
 
-const makeChannel = (): Channel =>
-  ({
-    assertQueue: vi.fn().mockResolvedValue(undefined),
-    consume: vi.fn(),
-    ack: vi.fn(),
-    nack: vi.fn(),
-    sendToQueue: vi.fn().mockReturnValue(true),
-  }) as unknown as Channel;
+type Handler = (type: string, payload: unknown) => Promise<void>;
+
+const makeBroker = () => {
+  let capturedHandler: Handler | null = null;
+  const broker = {
+    publish: vi.fn().mockResolvedValue(undefined),
+    subscribe: vi.fn().mockImplementation((_url: string, handler: Handler) => { capturedHandler = handler; }),
+    stop: vi.fn(),
+    triggerMessage: (type: string, payload: unknown) => capturedHandler!(type, payload),
+  };
+  return broker as unknown as SQSBroker & { triggerMessage(type: string, payload: unknown): Promise<void> };
+};
 
 const makeEnqueue = (): EnqueueServiceOrderUseCase =>
   ({ execute: vi.fn() }) as unknown as EnqueueServiceOrderUseCase;
@@ -40,7 +44,7 @@ const makeReplyProducer = (): ExecutionReplyProducer =>
   }) as unknown as ExecutionReplyProducer;
 
 describe('ExecutionCommandConsumer', () => {
-  let channel: Channel;
+  let broker: ReturnType<typeof makeBroker>;
   let enqueue: EnqueueServiceOrderUseCase;
   let cancel: CancelExecutionUseCase;
   let stockProducer: StockCommandProducer;
@@ -48,64 +52,38 @@ describe('ExecutionCommandConsumer', () => {
   let consumer: ExecutionCommandConsumer;
 
   beforeEach(() => {
-    channel = makeChannel();
+    broker = makeBroker();
     enqueue = makeEnqueue();
     cancel = makeCancel();
     stockProducer = makeStockProducer();
     replyProducer = makeReplyProducer();
-    consumer = new ExecutionCommandConsumer(
-      channel,
-      enqueue,
-      cancel,
-      stockProducer,
-      replyProducer,
-    );
+    consumer = new ExecutionCommandConsumer(broker, enqueue, cancel, stockProducer, replyProducer);
   });
 
-  it('should assert queue and start consuming on start()', async () => {
+  it('should call broker.subscribe on start()', async () => {
     await consumer.start();
-
-    expect(channel.assertQueue).toHaveBeenCalledWith('execution.commands', { durable: true });
-    expect(channel.consume).toHaveBeenCalledWith('execution.commands', expect.any(Function));
+    expect(broker.subscribe).toHaveBeenCalledOnce();
   });
 
   describe('ENFILEIRAR_OS', () => {
     it('should enqueue OS and send RESERVAR_ESTOQUE', async () => {
       vi.mocked(enqueue.execute).mockResolvedValue(
-        new ExecutionQueue({
-          serviceOrderId: orderId,
-          stockItems: [{ stockId, quantity: 3 }],
-        }),
+        new ExecutionQueue({ serviceOrderId: orderId, stockItems: [{ stockId, quantity: 3 }] }),
       );
 
-      const msg = {
-        content: Buffer.from(
-          JSON.stringify({
-            type: 'ENFILEIRAR_OS',
-            payload: {
-              serviceOrderId: orderId,
-              stockItems: [{ stockItemId: stockId, quantity: 3 }],
-            },
-          }),
-        ),
-      };
-
-      vi.mocked(channel.consume).mockImplementation((_q, handler) => {
-        handler(msg as never);
-        return Promise.resolve({} as never);
+      await consumer.start();
+      await broker.triggerMessage('ENFILEIRAR_OS', {
+        serviceOrderId: orderId,
+        stockItems: [{ stockItemId: stockId, quantity: 3 }],
       });
 
-      await consumer.start();
-
-      await vi.waitFor(() => {
-        expect(enqueue.execute).toHaveBeenCalledWith({
-          serviceOrderId: orderId,
-          stockItems: [{ stockId, quantity: 3 }],
-        });
-        expect(stockProducer.sendReservarEstoque).toHaveBeenCalledWith({
-          serviceOrderId: orderId,
-          items: [{ stockId, quantity: 3 }],
-        });
+      expect(enqueue.execute).toHaveBeenCalledWith({
+        serviceOrderId: orderId,
+        stockItems: [{ stockId, quantity: 3 }],
+      });
+      expect(stockProducer.sendReservarEstoque).toHaveBeenCalledWith({
+        serviceOrderId: orderId,
+        items: [{ stockId, quantity: 3 }],
       });
     });
   });
@@ -119,28 +97,13 @@ describe('ExecutionCommandConsumer', () => {
       });
       vi.mocked(cancel.execute).mockResolvedValue(cancelledQueue);
 
-      const msg = {
-        content: Buffer.from(
-          JSON.stringify({
-            type: 'CANCELAR_EXECUCAO',
-            payload: { serviceOrderId: orderId },
-          }),
-        ),
-      };
-
-      vi.mocked(channel.consume).mockImplementation((_q, handler) => {
-        handler(msg as never);
-        return Promise.resolve({} as never);
-      });
-
       await consumer.start();
+      await broker.triggerMessage('CANCELAR_EXECUCAO', { serviceOrderId: orderId });
 
-      await vi.waitFor(() => {
-        expect(cancel.execute).toHaveBeenCalledWith({ serviceOrderId: orderId });
-        expect(stockProducer.sendRestaurarEstoque).toHaveBeenCalledWith({
-          serviceOrderId: orderId,
-          items: [{ stockId, quantity: 2 }],
-        });
+      expect(cancel.execute).toHaveBeenCalledWith({ serviceOrderId: orderId });
+      expect(stockProducer.sendRestaurarEstoque).toHaveBeenCalledWith({
+        serviceOrderId: orderId,
+        items: [{ stockId, quantity: 2 }],
       });
     });
   });

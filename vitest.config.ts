@@ -14,6 +14,7 @@ export default defineConfig({
         'src/server.ts',
         'src/app.ts',
         'src/shared/config/**',
+        'src/shared/logger/**',
         'src/adapters/outbound/database/connection.ts',
         'src/adapters/outbound/messaging/**',
         'src/adapters/inbound/messaging/**',

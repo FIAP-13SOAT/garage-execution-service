@@ -7,20 +7,22 @@ import { ServiceOrderExecutionPresenter } from '../presenters/ServiceOrderExecut
 import { ServiceOrderExecutionController } from '../controllers/ServiceOrderExecutionController.js';
 import { requireRole } from '../middlewares/requireRole.js';
 import { UserRole } from '../../../../shared/types/UserRole.js';
+import type { ExecutionEventProducer } from '../../../outbound/messaging/ExecutionEventProducer.js';
 
-const gateway = new ServiceOrderExecutionGatewayImpl();
-const presenter = new ServiceOrderExecutionPresenter();
-const controller = new ServiceOrderExecutionController(
-  new StartExecutionUseCase(gateway),
-  new FinishExecutionUseCase(gateway),
-  new GetExecutionUseCase(gateway),
-  presenter,
-);
+export const createServiceOrderExecutionRouter = (eventProducer: ExecutionEventProducer): Router => {
+  const gateway = new ServiceOrderExecutionGatewayImpl();
+  const presenter = new ServiceOrderExecutionPresenter();
+  const controller = new ServiceOrderExecutionController(
+    new StartExecutionUseCase(gateway),
+    new FinishExecutionUseCase(gateway, eventProducer),
+    new GetExecutionUseCase(gateway),
+    presenter,
+  );
 
-const router = Router();
+  const router = Router();
+  router.post('/:serviceOrderId/start-execution', requireRole(UserRole.ADMIN, UserRole.MECHANIC), controller.start.bind(controller));
+  router.post('/:serviceOrderId/finish-execution', requireRole(UserRole.ADMIN, UserRole.MECHANIC), controller.finish.bind(controller));
+  router.get('/:serviceOrderId/execution', requireRole(UserRole.ADMIN, UserRole.MECHANIC, UserRole.CLERK), controller.get.bind(controller));
 
-router.post('/:serviceOrderId/start-execution', requireRole(UserRole.ADMIN, UserRole.MECHANIC), controller.start.bind(controller));
-router.post('/:serviceOrderId/finish-execution', requireRole(UserRole.ADMIN, UserRole.MECHANIC), controller.finish.bind(controller));
-router.get('/:serviceOrderId/execution', requireRole(UserRole.ADMIN, UserRole.MECHANIC, UserRole.CLERK), controller.get.bind(controller));
-
-export default router;
+  return router;
+};

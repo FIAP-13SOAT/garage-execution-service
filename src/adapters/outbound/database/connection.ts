@@ -1,11 +1,13 @@
-import mongoose from 'mongoose';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { env } from '../../../shared/config/env.js';
 
-export const connectDatabase = async (): Promise<void> => {
-  await mongoose.connect(env.mongoUrl);
-  console.log('MongoDB connected');
-};
+const clientConfig = env.dynamoEndpoint
+  ? { region: env.awsRegion, endpoint: env.dynamoEndpoint, credentials: { accessKeyId: 'local', secretAccessKey: 'local' } }
+  : { region: env.awsRegion };
 
-export const disconnectDatabase = async (): Promise<void> => {
-  await mongoose.disconnect();
-};
+const rawClient = new DynamoDBClient(clientConfig);
+
+export const dynamoDb = DynamoDBDocumentClient.from(rawClient, {
+  marshallOptions: { removeUndefinedValues: true },
+});

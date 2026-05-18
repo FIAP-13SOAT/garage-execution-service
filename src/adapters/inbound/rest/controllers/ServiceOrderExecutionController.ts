@@ -16,7 +16,7 @@ export class ServiceOrderExecutionController {
   async start(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const execution = await this.startUseCase.execute({
-        serviceOrderId: toUUID(req.params['serviceOrderId']!),
+        serviceOrderId: toUUID(req.params['serviceOrderId'] as string),
       });
       res.status(201).json(this.presenter.toResponse(execution));
     } catch (err) {
@@ -27,7 +27,7 @@ export class ServiceOrderExecutionController {
   async finish(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const execution = await this.finishUseCase.execute({
-        serviceOrderId: toUUID(req.params['serviceOrderId']!),
+        serviceOrderId: toUUID(req.params['serviceOrderId'] as string),
       });
       res.json(this.presenter.toResponse(execution));
     } catch (err) {
@@ -38,7 +38,7 @@ export class ServiceOrderExecutionController {
   async get(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const execution = await this.getUseCase.execute({
-        serviceOrderId: toUUID(req.params['serviceOrderId']!),
+        serviceOrderId: toUUID(req.params['serviceOrderId'] as string),
       });
       res.json(this.presenter.toResponse(execution));
     } catch (err) {

@@ -17,23 +17,13 @@ spec:
     spec:
       containers:
         - name: garage-execution-service
-          image: <ECR_REGISTRY>/garage-execution-service:latest
+          image: 500431122450.dkr.ecr.us-east-1.amazonaws.com/garage-app:execution-latest
           ports:
             - containerPort: 3000
           envFrom:
             - configMapRef:
                 name: garage-execution-service-config
           env:
-            - name: MONGO_URL
-              valueFrom:
-                secretKeyRef:
-                  name: garage-execution-service-secrets
-                  key: MONGO_URL
-            - name: RABBITMQ_URL
-              valueFrom:
-                secretKeyRef:
-                  name: garage-execution-service-secrets
-                  key: RABBITMQ_URL
             - name: DD_API_KEY
               valueFrom:
                 secretKeyRef:

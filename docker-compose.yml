@@ -1,0 +1,17 @@
+services:
+  localstack:
+    image: localstack/localstack:4
+    container_name: garage_execution_localstack
+    environment:
+      - SERVICES=sqs,dynamodb
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=local
+      - AWS_SECRET_ACCESS_KEY=local
+    ports:
+      - "4566:4566"
+    volumes:
+      - ./localstack:/etc/localstack/init/ready.d
+      - localstack_data:/var/lib/localstack
+
+volumes:
+  localstack_data:
