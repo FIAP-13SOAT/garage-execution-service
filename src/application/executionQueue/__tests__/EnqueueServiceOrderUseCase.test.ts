@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EnqueueServiceOrderUseCase } from '../EnqueueServiceOrderUseCase.js';
 import { ExecutionQueue } from '../../../domain/executionQueue/ExecutionQueue.js';
 import { ExecutionQueueStatus } from '../../../domain/executionQueue/ExecutionQueueStatus.js';
-import { ExecutionQueueAlreadyExistsException } from '../exceptions/ExecutionQueueAlreadyExistsException.js';
 import { toUUID } from '../../../shared/types/UUID.js';
 import type { ExecutionQueueGateway } from '../../../adapters/outbound/database/ExecutionQueueGateway.js';
 
@@ -38,7 +37,7 @@ describe('EnqueueServiceOrderUseCase', () => {
     expect(gateway.save).toHaveBeenCalledOnce();
   });
 
-  it('should throw when queue already exists and is not cancelled', async () => {
+  it('should return existing queue when it is not cancelled (idempotent)', async () => {
     const existing = new ExecutionQueue({
       serviceOrderId: orderId,
       stockItems: [],
@@ -46,9 +45,10 @@ describe('EnqueueServiceOrderUseCase', () => {
     });
     vi.mocked(gateway.findByServiceOrderId).mockResolvedValue(existing);
 
-    await expect(
-      useCase.execute({ serviceOrderId: orderId, stockItems: [] }),
-    ).rejects.toThrow(ExecutionQueueAlreadyExistsException);
+    const result = await useCase.execute({ serviceOrderId: orderId, stockItems: [] });
+
+    expect(result).toBe(existing);
+    expect(gateway.save).not.toHaveBeenCalled();
   });
 
   it('should allow re-enqueue when existing queue is cancelled', async () => {

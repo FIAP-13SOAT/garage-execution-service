@@ -1,40 +1,28 @@
-import type { Channel } from 'amqplib';
 import {
   StockReply,
-  type SagaMessage,
   type EstoqueReservadoPayload,
   type EstoqueInsuficientePayload,
   type EstoqueRestauradoPayload,
 } from '../../../application/messaging/messages.js';
 import type { CancelExecutionUseCase } from '../../../application/executionQueue/CancelExecutionUseCase.js';
 import type { ExecutionReplyProducer } from '../../outbound/messaging/ExecutionReplyProducer.js';
-import { setupQueue } from '../../outbound/messaging/setupQueue.js';
+import type { SQSBroker } from '../../outbound/messaging/SQSBroker.js';
 import { toUUID } from '../../../shared/types/UUID.js';
 import { Logger } from '../../../shared/logger/Logger.js';
-
-const QUEUE = 'stock.replies';
+import { env } from '../../../shared/config/env.js';
 
 export class StockReplyConsumer {
   constructor(
-    private readonly channel: Channel,
+    private readonly broker: SQSBroker,
     private readonly cancelExecution: CancelExecutionUseCase,
     private readonly replyProducer: ExecutionReplyProducer,
   ) {}
 
   async start(): Promise<void> {
-    await setupQueue(this.channel, QUEUE);
-    await this.channel.consume(QUEUE, async (msg) => {
-      if (!msg) return;
-      try {
-        const { type, payload } = JSON.parse(msg.content.toString()) as SagaMessage;
-        await this.handle(type, payload);
-        this.channel.ack(msg);
-      } catch (err) {
-        Logger.error('[StockReplyConsumer] Failed to process message', { err });
-        this.channel.nack(msg, false, false);
-      }
+    this.broker.subscribe(env.sqsQueues.stockReplies, async (type, payload) => {
+      await this.handle(type, payload);
     });
-    Logger.info('[StockReplyConsumer] Listening', { queue: QUEUE });
+    Logger.info('[StockReplyConsumer] Listening', { queue: env.sqsQueues.stockReplies });
   }
 
   private async handle(type: string, payload: unknown): Promise<void> {
@@ -54,20 +42,13 @@ export class StockReplyConsumer {
   }
 
   private async handleEstoqueReservado(payload: EstoqueReservadoPayload): Promise<void> {
-    await this.replyProducer.sendOsEnfileirada({
-      serviceOrderId: toUUID(payload.serviceOrderId),
-    });
+    await this.replyProducer.sendOsEnfileirada({ serviceOrderId: toUUID(payload.serviceOrderId) });
   }
 
   private async handleEstoqueInsuficiente(payload: EstoqueInsuficientePayload): Promise<void> {
     const serviceOrderId = toUUID(payload.serviceOrderId);
-
     await this.cancelExecution.execute({ serviceOrderId });
-
-    await this.replyProducer.sendExecucaoFalha({
-      serviceOrderId,
-      reason: payload.reason,
-    });
+    await this.replyProducer.sendExecucaoFalha({ serviceOrderId, reason: payload.reason });
   }
 
   private async handleEstoqueRestaurado(payload: EstoqueRestauradoPayload): Promise<void> {

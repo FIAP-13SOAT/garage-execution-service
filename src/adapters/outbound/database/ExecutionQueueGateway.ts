@@ -1,73 +1,41 @@
-import mongoose, { Schema, type HydratedDocument } from 'mongoose';
+import { PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 import { ExecutionQueue, type StockItem } from '../../../domain/executionQueue/ExecutionQueue.js';
 import { ExecutionQueueStatus } from '../../../domain/executionQueue/ExecutionQueueStatus.js';
 import { toUUID } from '../../../shared/types/UUID.js';
 import type { UUID } from '../../../shared/types/UUID.js';
+import { dynamoDb } from './connection.js';
 
 export interface ExecutionQueueGateway {
   save(queue: ExecutionQueue): Promise<void>;
   findByServiceOrderId(serviceOrderId: UUID): Promise<ExecutionQueue | null>;
 }
 
-interface StockItemDoc {
-  stockId: string;
-  quantity: number;
-}
-
-interface ExecutionQueueDoc {
-  serviceOrderId: string;
-  status: ExecutionQueueStatus;
-  stockItems: StockItemDoc[];
-}
-
-const stockItemSchema = new Schema<StockItemDoc>(
-  {
-    stockId: { type: String, required: true },
-    quantity: { type: Number, required: true },
-  },
-  { _id: false },
-);
-
-const schema = new Schema<ExecutionQueueDoc>(
-  {
-    serviceOrderId: { type: String, required: true, unique: true },
-    status: {
-      type: String,
-      enum: Object.values(ExecutionQueueStatus),
-      default: ExecutionQueueStatus.PENDING,
-    },
-    stockItems: { type: [stockItemSchema], default: [] },
-  },
-  { timestamps: true, collection: 'execution_queue' },
-);
-
-const ExecutionQueueModel = mongoose.model('ExecutionQueue', schema);
-
-function toDomain(doc: HydratedDocument<ExecutionQueueDoc>): ExecutionQueue {
-  return new ExecutionQueue({
-    serviceOrderId: toUUID(doc.serviceOrderId),
-    status: doc.status,
-    stockItems: doc.stockItems.map(
-      (i): StockItem => ({ stockId: toUUID(i.stockId), quantity: i.quantity }),
-    ),
-  });
-}
+const TABLE = 'ExecutionQueue';
 
 export class ExecutionQueueGatewayImpl implements ExecutionQueueGateway {
   async save(queue: ExecutionQueue): Promise<void> {
-    await ExecutionQueueModel.findOneAndUpdate(
-      { serviceOrderId: queue.serviceOrderId },
-      {
+    await dynamoDb.send(new PutCommand({
+      TableName: TABLE,
+      Item: {
         serviceOrderId: queue.serviceOrderId,
         status: queue.status,
         stockItems: queue.stockItems,
       },
-      { upsert: true },
-    );
+    }));
   }
 
   async findByServiceOrderId(serviceOrderId: UUID): Promise<ExecutionQueue | null> {
-    const doc = await ExecutionQueueModel.findOne({ serviceOrderId });
-    return doc ? toDomain(doc) : null;
+    const result = await dynamoDb.send(new GetCommand({
+      TableName: TABLE,
+      Key: { serviceOrderId },
+    }));
+    if (!result.Item) return null;
+    return new ExecutionQueue({
+      serviceOrderId: toUUID(result.Item['serviceOrderId'] as string),
+      status: result.Item['status'] as ExecutionQueueStatus,
+      stockItems: (result.Item['stockItems'] as Array<{ stockId: string; quantity: number }>).map(
+        (i): StockItem => ({ stockId: toUUID(i.stockId), quantity: i.quantity }),
+      ),
+    });
   }
 }

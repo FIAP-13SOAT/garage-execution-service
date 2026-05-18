@@ -1,7 +1,7 @@
 FROM node:24-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
@@ -13,7 +13,7 @@ ENV NODE_ENV=production \
     DD_ENV=production \
     DD_VERSION=1.0.0
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm install --omit=dev
 COPY --from=builder /app/dist ./dist
 EXPOSE 3000
 USER node

@@ -6,6 +6,12 @@ metadata:
 data:
   PORT: "3000"
   NODE_ENV: "production"
+  AWS_REGION: "us-east-1"
+  SQS_EXECUTION_COMMANDS_URL: "https://sqs.us-east-1.amazonaws.com/500431122450/garage-execution-commands"
+  SQS_EXECUTION_REPLIES_URL: "https://sqs.us-east-1.amazonaws.com/500431122450/garage-execution-replies"
+  SQS_EXECUTION_EVENTS_URL: "https://sqs.us-east-1.amazonaws.com/500431122450/garage-execution-events"
+  SQS_STOCK_COMMANDS_URL: "https://sqs.us-east-1.amazonaws.com/500431122450/garage-stock-commands"
+  SQS_STOCK_REPLIES_URL: "https://sqs.us-east-1.amazonaws.com/500431122450/garage-stock-replies"
   DD_SERVICE: "garage-execution-service"
   DD_ENV: "production"
   DD_VERSION: "1.0.0"
