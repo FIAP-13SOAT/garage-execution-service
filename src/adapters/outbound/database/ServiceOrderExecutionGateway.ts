@@ -1,60 +1,40 @@
-import mongoose, { Schema, type HydratedDocument } from 'mongoose';
+import { PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 import { ServiceOrderExecution } from '../../../domain/serviceOrderExecution/ServiceOrderExecution.js';
 import { toUUID } from '../../../shared/types/UUID.js';
 import type { UUID } from '../../../shared/types/UUID.js';
+import { dynamoDb } from './connection.js';
 
 export interface ServiceOrderExecutionGateway {
   save(execution: ServiceOrderExecution): Promise<void>;
   findByServiceOrderId(serviceOrderId: UUID): Promise<ServiceOrderExecution | null>;
 }
 
-interface ServiceOrderExecutionDoc {
-  serviceOrderId: string;
-  startDate: Date | null;
-  endDate: Date | null;
-  executionTimeMs: number;
-}
-
-const schema = new Schema<ServiceOrderExecutionDoc>(
-  {
-    serviceOrderId: { type: String, required: true, unique: true },
-    startDate: { type: Date, default: null },
-    endDate: { type: Date, default: null },
-    executionTimeMs: { type: Number, default: 0 },
-  },
-  { timestamps: true, collection: 'service_order_executions' },
-);
-
-const ServiceOrderExecutionModel = mongoose.model(
-  'ServiceOrderExecution',
-  schema,
-);
-
-function toDomain(doc: HydratedDocument<ServiceOrderExecutionDoc>): ServiceOrderExecution {
-  return new ServiceOrderExecution({
-    serviceOrderId: toUUID(doc.serviceOrderId),
-    startDate: doc.startDate ?? undefined,
-    endDate: doc.endDate ?? undefined,
-    executionTimeMs: doc.executionTimeMs,
-  });
-}
+const TABLE = 'ServiceOrderExecution';
 
 export class ServiceOrderExecutionGatewayImpl implements ServiceOrderExecutionGateway {
   async save(execution: ServiceOrderExecution): Promise<void> {
-    await ServiceOrderExecutionModel.findOneAndUpdate(
-      { serviceOrderId: execution.serviceOrderId },
-      {
+    await dynamoDb.send(new PutCommand({
+      TableName: TABLE,
+      Item: {
         serviceOrderId: execution.serviceOrderId,
-        startDate: execution.startDate,
-        endDate: execution.endDate,
+        startDate: execution.startDate?.toISOString() ?? null,
+        endDate: execution.endDate?.toISOString() ?? null,
         executionTimeMs: execution.executionTimeMs,
       },
-      { upsert: true },
-    );
+    }));
   }
 
   async findByServiceOrderId(serviceOrderId: UUID): Promise<ServiceOrderExecution | null> {
-    const doc = await ServiceOrderExecutionModel.findOne({ serviceOrderId });
-    return doc ? toDomain(doc) : null;
+    const result = await dynamoDb.send(new GetCommand({
+      TableName: TABLE,
+      Key: { serviceOrderId },
+    }));
+    if (!result.Item) return null;
+    return new ServiceOrderExecution({
+      serviceOrderId: toUUID(result.Item['serviceOrderId'] as string),
+      startDate: result.Item['startDate'] ? new Date(result.Item['startDate'] as string) : undefined,
+      endDate: result.Item['endDate'] ? new Date(result.Item['endDate'] as string) : undefined,
+      executionTimeMs: result.Item['executionTimeMs'] as number,
+    });
   }
 }

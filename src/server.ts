@@ -1,8 +1,7 @@
 import 'dotenv/config';
 import './instrument.js';
 import app from './app.js';
-import { connectDatabase } from './adapters/outbound/database/connection.js';
-import { getRabbitMQChannel } from './adapters/outbound/messaging/rabbitmq.js';
+import { SQSBroker, sqsClient } from './adapters/outbound/messaging/SQSBroker.js';
 import { env } from './shared/config/env.js';
 import { Logger } from './shared/logger/Logger.js';
 import { ExecutionQueueGatewayImpl } from './adapters/outbound/database/ExecutionQueueGateway.js';
@@ -16,37 +15,36 @@ import { StockReplyConsumer } from './adapters/inbound/messaging/StockReplyConsu
 import { createServiceOrderExecutionRouter } from './adapters/inbound/rest/routes/serviceOrderExecutionResource.js';
 
 const start = async (): Promise<void> => {
-  await connectDatabase();
-
-  const channel = await getRabbitMQChannel();
+  const broker = new SQSBroker(sqsClient);
 
   const executionQueueGateway = new ExecutionQueueGatewayImpl();
-  const stockProducer = new StockCommandProducer(channel);
-  const replyProducer = new ExecutionReplyProducer(channel);
-  const eventProducer = new ExecutionEventProducer(channel);
+  const stockProducer = new StockCommandProducer(broker);
+  const replyProducer = new ExecutionReplyProducer(broker);
+  const eventProducer = new ExecutionEventProducer(broker);
 
-  const consumer = new ExecutionCommandConsumer(
-    channel,
+  await new ExecutionCommandConsumer(
+    broker,
     new EnqueueServiceOrderUseCase(executionQueueGateway),
     new CancelExecutionUseCase(executionQueueGateway),
     stockProducer,
     replyProducer,
-  );
+  ).start();
 
-  await consumer.start();
-
-  const stockReplyConsumer = new StockReplyConsumer(
-    channel,
-    new CancelExecutionUseCase(executionQueueGateway),
-    replyProducer,
-  );
-  await stockReplyConsumer.start();
+  await new StockReplyConsumer(broker, new CancelExecutionUseCase(executionQueueGateway), replyProducer).start();
 
   app.use('/service-orders', createServiceOrderExecutionRouter(eventProducer));
 
-  app.listen(env.port, () => {
+  const server = app.listen(env.port, () => {
     Logger.info(`garage-execution-service running on port ${env.port}`);
   });
+
+  const shutdown = (): void => {
+    broker.stop();
+    server.close();
+  };
+
+  process.once('SIGTERM', shutdown);
+  process.once('SIGINT', shutdown);
 };
 
 start().catch((err) => {
