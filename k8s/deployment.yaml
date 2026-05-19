@@ -24,11 +24,6 @@ spec:
             - configMapRef:
                 name: garage-execution-service-config
           env:
-            - name: DD_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: datadog-secrets
-                  key: DD_API_KEY
             - name: DD_AGENT_HOST
               valueFrom:
                 fieldRef:
