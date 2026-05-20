@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: garage-execution-service
-          image: 500431122450.dkr.ecr.us-east-1.amazonaws.com/garage-app:execution-latest
+          image: 500431122450.dkr.ecr.us-east-1.amazonaws.com/garage-execution-service:execution-latest
           ports:
             - containerPort: 3000
           envFrom:
