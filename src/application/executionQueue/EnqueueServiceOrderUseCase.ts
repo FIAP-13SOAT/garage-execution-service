@@ -1,6 +1,5 @@
 import type { UUID } from '../../shared/types/UUID.js';
 import { ExecutionQueue, type StockItem } from '../../domain/executionQueue/ExecutionQueue.js';
-import { ExecutionQueueAlreadyExistsException } from './exceptions/ExecutionQueueAlreadyExistsException.js';
 import type { ExecutionQueueGateway } from '../../adapters/outbound/database/ExecutionQueueGateway.js';
 
 export type Command = {
