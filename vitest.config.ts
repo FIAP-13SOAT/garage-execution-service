@@ -9,6 +9,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'json-summary', 'json'],
+      reportOnFailure: true,
       exclude: [
         'src/instrument.ts',
         'src/server.ts',
