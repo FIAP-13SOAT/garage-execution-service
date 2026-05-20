@@ -6,4 +6,8 @@ router.get('/', (_req, res) => {
   res.json({ status: 'ok', service: 'garage-execution-service' });
 });
 
+router.get('/version', (_req, res) => {
+  res.json({ version: '1.0.0', service: 'garage-execution-service' });
+});
+
 export default router;
