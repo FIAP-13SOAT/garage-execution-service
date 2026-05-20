@@ -43,22 +43,6 @@ jobs:
 
       - name: Create / update K8s secrets
         run: |
-          # DocumentDB — sem Prisma, schema criado automaticamente pelo Mongoose
-          DOCDB_HOST=$(aws ssm get-parameter \
-            --name /garage/prod/execution/docdb/endpoint \
-            --query Parameter.Value --output text)
-          SECRET_ARN=$(aws ssm get-parameter \
-            --name /garage/prod/execution/docdb/secret_arn \
-            --query Parameter.Value --output text)
-          DOCDB_PASS=$(aws secretsmanager get-secret-value \
-            --secret-id "$SECRET_ARN" \
-            --query SecretString --output text | jq -r '.password | @uri')
-          MONGO_URL="mongodb://mongo:${DOCDB_PASS}@${DOCDB_HOST}:27017/garage_execution?tls=true&tlsAllowInvalidCertificates=true&retryWrites=false"
-
-          kubectl create secret generic garage-execution-service-secrets \
-            --from-literal=MONGO_URL="$MONGO_URL" \
-            --dry-run=client -o yaml | kubectl apply -f -
-
           kubectl create secret generic datadog-secrets \
             --from-literal=DD_API_KEY="${{ secrets.DD_API_KEY }}" \
             --dry-run=client -o yaml | kubectl apply -f -
