@@ -52,7 +52,7 @@ jobs:
             --query Parameter.Value --output text)
           DOCDB_PASS=$(aws secretsmanager get-secret-value \
             --secret-id "$SECRET_ARN" \
-            --query SecretString --output text | jq -r '.password')
+            --query SecretString --output text | jq -r '.password | @uri')
           MONGO_URL="mongodb://mongo:${DOCDB_PASS}@${DOCDB_HOST}:27017/garage_execution?tls=true&tlsAllowInvalidCertificates=true&retryWrites=false"
 
           kubectl create secret generic garage-execution-service-secrets \
